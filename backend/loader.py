@@ -1,11 +1,14 @@
+import pickle
 import random
+from os import path
+
 from backend.model.graph import Graph
 
 
 def generate_random_graph(size):
     g = Graph()
     for i in range(size):
-        g.add_node("node{}".format(i),"node{}".format(i))
+        g.add_node("node{}".format(i), "node{}".format(i))
     rdm = random.Random()
     for i in range(size * (size - 1) // 2):
         if rdm.random() > 0.8:
@@ -20,6 +23,8 @@ def generate_random_graph(size):
 
 def load_red_graph():
     g = Graph()
+    if path.exists("backend/model/red.pkl"):
+        return pickle.load(open("backend/model/red.pkl", 'rb'))
     with open('backend/data/red/names.txt', 'r') as f:
         for x in f.readlines():
             g.add_node(x.strip(), x.strip())
@@ -27,4 +32,7 @@ def load_red_graph():
         for ed in f.readlines():
             ed = ed.split(";")
             g.add_edge(ed[0].strip(), ed[1].strip(), float(ed[2].strip()))
+    g.calc_dists()
+    g.calc_cluster_coefficient()
+    pickle.dump(g, open("backend/model/red.pkl", "wb"))
     return g
