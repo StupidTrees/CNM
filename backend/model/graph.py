@@ -17,6 +17,7 @@ class Graph:
         self.dists = {}
         self.cluster_coefficient = {}
 
+    # 构建图
     def add_node(self, label="", id=None):
         n = Node(self, self.nodes_id_ptr if id is None else id, label)
         self.nodes_id_ptr += 1
@@ -33,6 +34,7 @@ class Graph:
             self.id2nodes[from_id].neighbours.append((self.id2nodes[to_id], weight))
             self.id2nodes[to_id].prevs.append((self.id2nodes[from_id], weight))
 
+    # 基本参数的计算
     def get_average_degree(self):
         res = 0
         for n in self.nodes:
@@ -99,4 +101,8 @@ class Graph:
             self.calc_cluster_coefficient()
         return np.average([x for x in self.cluster_coefficient.values()])
 
-
+    # 其他功能
+    def get_popular_nodes(self, n=10):
+        nodes = [(n, n.get_degree()) for n in self.nodes]
+        nodes = sorted(nodes, key=lambda x: x[1], reverse=True)
+        return nodes[:n]

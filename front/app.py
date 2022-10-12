@@ -4,7 +4,7 @@ from dash import dcc
 from dash import html
 from dash import Dash
 from dash.dependencies import Output, Input
-
+import plotly.graph_objects as go
 from front.adapter import graph_to_view
 from front.view_model import red_graph, kingdom_graph, west_graph, who_graph
 
@@ -13,7 +13,7 @@ external_stylesheets = [
     "https://codepen.io/chriddyp/pen/bWLwgP.css",
 ]
 
-app = Dash(__name__,external_stylesheets = external_stylesheets)
+app = Dash(__name__, external_stylesheets=external_stylesheets)
 dt = 1
 t_max = 100
 ######## ## the APP
@@ -123,13 +123,7 @@ charts = html.Div(
             style={'width': '100%', 'height': '1000px'},
             stylesheet=[]
         )
-        ,
-        dcc.Graph(
-            id="time-graph", figure={"layout": {"height": 300}}
-        ),
-        dcc.Graph(
-            id="freq-graph", figure={"layout": {"height": 400}}
-        ),
+        , dcc.Graph(id='popular_nodes')
     ]
 )
 app.layout = html.Div(
@@ -165,6 +159,7 @@ app.layout = html.Div(
     Output("avg_degree", "children"),
     Output("avg_path_len", "children"),
     Output("cluster_co", "children"),
+    Output("popular_nodes", "figure"),
     Input("window-dropdown", "value"),
 )
 def update_figure(book):
@@ -178,8 +173,15 @@ def update_figure(book):
     elif book == 'who':
         graph = who_graph
     ss, e = graph_to_view(graph)
+    pn = graph.get_popular_nodes(15)
+    names = [n.id for n, _ in pn]
+    degrees = [degree for _, degree in pn]
+    popular = go.Figure(
+        data=[go.Bar(x=names, y=degrees)],
+        layout_title_text="热门人物"
+    )
     return e, "{:.2f}".format(graph.get_average_degree()), "{:.2f}".format(
-        graph.get_average_path_length()), "{:.2f}".format(graph.get_cluster_coefficient()),
+        graph.get_average_path_length()), "{:.2f}".format(graph.get_cluster_coefficient()), popular
 
 
 @app.callback(
