@@ -27,6 +27,8 @@ class Graph:
         self.size += 1
 
     def add_edge(self, from_id, to_id, weight=0.0):
+        if from_id == to_id:
+            return
         if from_id in self.nodes2id.values() and to_id in self.nodes2id.values():
             if from_id not in self.edges.keys():
                 self.edges[from_id] = []
@@ -102,7 +104,21 @@ class Graph:
         return np.average([x for x in self.cluster_coefficient.values()])
 
     # 其他功能
+
+    def get_node_class(self, node):
+        """
+        获得结点类别，例如红楼梦的家族，三国的势力
+        :param node:
+        :return: string，class
+        """
+        pass
+
     def get_popular_nodes(self, n=10):
         nodes = [(n, n.get_degree()) for n in self.nodes]
+        nodes = sorted(nodes, key=lambda x: x[1], reverse=True)
+        return nodes[:n]
+
+    def get_high_cluster_nodes(self, n=10):
+        nodes = [(n, self.cluster_coefficient[n]) for n in self.nodes]
         nodes = sorted(nodes, key=lambda x: x[1], reverse=True)
         return nodes[:n]

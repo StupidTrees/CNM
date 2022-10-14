@@ -1,5 +1,6 @@
 import dash_bootstrap_components as dbc
 import dash_cytoscape as cyto
+import numpy as np
 from dash import dcc
 from dash import html
 from dash import Dash
@@ -14,8 +15,6 @@ external_stylesheets = [
 ]
 
 app = Dash(__name__, external_stylesheets=external_stylesheets)
-dt = 1
-t_max = 100
 ######## ## the APP
 
 
@@ -66,52 +65,33 @@ panel = html.Div(
                     className="inline",
                     id="layout-radio",
                     options=[
+                        {"label": "COSE", "value": "cose"},
                         {"label": "中心", "value": "concentric"},
                         {"label": "环状", "value": "circle"},
                         {"label": "宽度", "value": "breadthfirst"},
                         {"label": "随机", "value": "random"},
                         {"label": "网格", "value": "grid"},
                     ],
-                    value="concentric",
+                    value="cose",
                     labelStyle={
                         "display": "inline-block",
                         "margin": "6px",
                     },
                 ),
+                html.Label(id="degree-slider-label", children="按度数筛选节点:"),
+                dcc.RangeSlider(
+                    id="degree-slider",
+                    min=0,
+                    max=400,
+                    value=[0, 500],
+                    step=5,
+                    marks={
+                        str(int(x)): str(int(x))
+                        for x in np.linspace(0, 500, 5)
+                    },
+                ),
             ],
-        ),
-        html.Div(
-            className="row",
-            children=[
-                # html.Button(
-                #     id="autogate-button", children="AutoGate"
-                # ),
-                # html.Label("Center Frequency(ns)"),
-                # dcc.Slider(
-                #     id="center-slider",
-                #     min=-t_max,
-                #     max=t_max,
-                #     value=0,
-                #     step=dt * 10,
-                #     marks={
-                #         str(int(x)): str(int(x))
-                #         for x in np.linspace(-t_max, t_max, 13)
-                #     },
-                # ),
-                # html.Label("Span Frequency(ns)"),
-                # dcc.Slider(
-                #     id="span-slider",
-                #     min=0,
-                #     max=t_max,
-                #     value=10,
-                #     step=dt * 10,
-                #     marks={
-                #         str(int(x)): str(int(x))
-                #         for x in np.linspace(-t_max, t_max, 13)
-                #     },
-                # ),
-            ],
-        ),
+        )
     ],
 )
 charts = html.Div(
@@ -121,9 +101,11 @@ charts = html.Div(
             elements=[],
             layout={'name': 'concentric'},
             style={'width': '100%', 'height': '1000px'},
-            stylesheet=[]
+            stylesheet=[],
+            responsive=True
         )
         , dcc.Graph(id='popular_nodes')
+        , dcc.Graph(id='cluster_nodes')
     ]
 )
 app.layout = html.Div(
@@ -155,14 +137,24 @@ app.layout = html.Div(
 
 
 @app.callback(
+    Output("degree-slider-label", "children"),
+    Input("degree-slider", "value")
+)
+def update_label(degree_range):
+    return "按度数筛选节点：{}-{}".format(degree_range[0], degree_range[1])
+
+
+@app.callback(
     Output("cytoscape", "elements"),
     Output("avg_degree", "children"),
     Output("avg_path_len", "children"),
     Output("cluster_co", "children"),
     Output("popular_nodes", "figure"),
+    Output("cluster_nodes", "figure"),
     Input("window-dropdown", "value"),
+    Input("degree-slider", "value")
 )
-def update_figure(book):
+def update_figure(book, degree_range):
     graph = None
     if book == 'red':
         graph = red_graph
@@ -172,32 +164,36 @@ def update_figure(book):
         graph = west_graph
     elif book == 'who':
         graph = who_graph
-    ss, e = graph_to_view(graph)
-    pn = graph.get_popular_nodes(15)
-    names = [n.id for n, _ in pn]
-    degrees = [degree for _, degree in pn]
+    ss, e = graph_to_view(graph, degree_range)
+    cn = graph.get_high_cluster_nodes(len(graph.nodes))
+    cluster = go.Figure(
+        data=[go.Bar(x=[n.id for n, _ in cn], y=[ce for _, ce in cn])],
+        layout_title_text="人物聚类系数"
+    )
+    pn = graph.get_popular_nodes(len(graph.nodes))
     popular = go.Figure(
-        data=[go.Bar(x=names, y=degrees)],
-        layout_title_text="热门人物"
+        data=[go.Bar(x=[n.id for n, _ in pn], y=[degree for _, degree in pn])],
+        layout_title_text="人物度数"
     )
     return e, "{:.2f}".format(graph.get_average_degree()), "{:.2f}".format(
-        graph.get_average_path_length()), "{:.2f}".format(graph.get_cluster_coefficient()), popular
+        graph.get_average_path_length()), "{:.2f}".format(graph.get_cluster_coefficient()), popular, cluster
 
 
 @app.callback(
     Output("cytoscape", "stylesheet"),
     Input("window-dropdown", "value"),
+    Input("degree-slider", "value")
 )
-def update_figure(book):
+def update_figure(book, degree_range):
     global ss
     if book == 'red':
-        ss, e = graph_to_view(red_graph)
+        ss, e = graph_to_view(red_graph, degree_range)
     elif book == 'kingdom':
-        ss, e = graph_to_view(kingdom_graph)
+        ss, e = graph_to_view(kingdom_graph, degree_range)
     elif book == 'west':
-        ss, e = graph_to_view(west_graph)
+        ss, e = graph_to_view(west_graph, degree_range)
     elif book == 'who':
-        ss, e = graph_to_view(who_graph)
+        ss, e = graph_to_view(who_graph, degree_range)
     return ss
 
 
@@ -205,6 +201,26 @@ def update_figure(book):
     Output("cytoscape", "layout"),
     Input("layout-radio", "value")
 )
-def update_figure(layout):
-    layout = {"name": layout}
+def update_figure(type):
+    layout = {}
+    if type== 'cose':
+        layout = {
+            'idealEdgeLength': 200,
+            'refresh': 20,
+            'fit': True,
+            'padding': 30,
+            'randomize': False,
+            'animate':True,
+            'componentSpacing': 200,
+            'nodeRepulsion': 20000000,
+            'nodeOverlap': 500,
+            'edgeElasticity': 200,
+            'nestingFactor': 5,
+            'gravity': 80,
+            'numIter': 1000,
+            'initialTemp': 300,
+            'coolingFactor': 0.99,
+            'minTemp': 1.0
+        }
+    layout["name"] = type
     return layout
