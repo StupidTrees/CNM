@@ -1,7 +1,3 @@
-import random
-
-import dash_cytoscape as cyto
-
 from utils.color import random_color
 
 

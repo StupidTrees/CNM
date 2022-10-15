@@ -113,12 +113,16 @@ class Graph:
         """
         pass
 
-    def get_popular_nodes(self, n=10):
+    def get_popular_nodes(self, n=None):
         nodes = [(n, n.get_degree()) for n in self.nodes]
         nodes = sorted(nodes, key=lambda x: x[1], reverse=True)
+        if n is None:
+            n = len(nodes)
         return nodes[:n]
 
-    def get_high_cluster_nodes(self, n=10):
-        nodes = [(n, self.cluster_coefficient[n]) for n in self.nodes]
-        nodes = sorted(nodes, key=lambda x: x[1], reverse=True)
+    def get_low_cluster_nodes(self, n=None):
+        nodes = [(n, v) for n,v in self.cluster_coefficient.items()]
+        nodes = sorted(nodes, key=lambda x: x[1], reverse=False)
+        if n is None:
+            n = len(nodes)
         return nodes[:n]

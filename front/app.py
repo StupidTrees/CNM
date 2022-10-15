@@ -165,12 +165,12 @@ def update_figure(book, degree_range):
     elif book == 'who':
         graph = who_graph
     ss, e = graph_to_view(graph, degree_range)
-    cn = graph.get_high_cluster_nodes(len(graph.nodes))
+    cn = graph.get_low_cluster_nodes()
     cluster = go.Figure(
         data=[go.Bar(x=[n.id for n, _ in cn], y=[ce for _, ce in cn])],
         layout_title_text="人物聚类系数"
     )
-    pn = graph.get_popular_nodes(len(graph.nodes))
+    pn = graph.get_popular_nodes()
     popular = go.Figure(
         data=[go.Bar(x=[n.id for n, _ in pn], y=[degree for _, degree in pn])],
         layout_title_text="人物度数"
@@ -210,7 +210,7 @@ def update_figure(type):
             'fit': True,
             'padding': 30,
             'randomize': False,
-            'animate':True,
+            'animate':False,
             'componentSpacing': 200,
             'nodeRepulsion': 20000000,
             'nodeOverlap': 500,
