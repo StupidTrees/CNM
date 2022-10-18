@@ -1,6 +1,6 @@
-from backend.loader import load_red_graph, generate_random_graph, load_kingdom_graph
+from backend.loader import *
 
 red_graph = load_red_graph()
 kingdom_graph = load_kingdom_graph()
-who_graph = generate_random_graph(100)
-west_graph = generate_random_graph(100)
+who_graph = load_who_graph()
+west_graph = load_west_graph()

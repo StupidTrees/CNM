@@ -1,8 +1,0 @@
-name: mcn_dataset
-channels:
-  - defaults
-dependencies:
-  - pip=22.2.2
-  - python=3.10.6
-  - pip:
-    - pytest==7.1.3

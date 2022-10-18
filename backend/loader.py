@@ -1,3 +1,4 @@
+import os.path
 import pickle
 import random
 import sys
@@ -22,49 +23,90 @@ def generate_random_graph(size):
     return g
 
 
-class RedGraph(Graph):
-    def get_node_class(self, node):
-        return node.label[0]
-
-
-def load_red_graph():
-    g = RedGraph()
-    if path.exists("backend/model/red.pkl"):
-        return pickle.load(open("backend/model/red.pkl", 'rb'))
-    with open('backend/data/red/names.txt', 'r') as f:
-        for x in f.readlines():
-            g.add_node(x.strip(), x.strip())
-    with open('backend/data/red/edges_Mandarin.csv', 'r') as f:
-        for ed in f.readlines():
-            ed = ed.split(";")
-            g.add_edge(ed[0].strip(), ed[1].strip(), float(ed[2].strip()))
-    g.calc_dists()
-    g.calc_cluster_coefficient()
-    pickle.dump(g, open("backend/model/red.pkl", "wb"))
-    return g
-
-
-class KingdomGraph(Graph):
-    def get_node_class(self, node):
-        return node.label[0]
-
-def load_kingdom_graph():
+def load_graph(clz, label):
     sys.setrecursionlimit(3000)
-    g = KingdomGraph()
-    if path.exists("backend/model/kingdom.pkl"):
-        print('load graph from disk...')
-        return pickle.load(open("backend/model/kingdom.pkl", 'rb'))
-    with open('backend/data/kingdom/names.txt', 'r') as f:
+    g = clz()
+    if path.exists("backend/model/cache/{}.pkl".format(label)):
+        print('load graph {} from disk...'.format(label))
+        return pickle.load(open("backend/model/cache/{}.pkl".format(label), 'rb'))
+    with open('backend/data/parsed/{}/names.txt'.format(label), 'r') as f:
         for x in f.readlines():
             g.add_node(x.strip(), x.strip())
-    with open('backend/data/kingdom/edges.txt', 'r') as f:
+    with open('backend/data/parsed/{}/edges.txt'.format(label), 'r') as f:
         for ed in f.readlines():
             ed = ed.split(";")
             n1 = ed[0].strip()
             n2 = ed[1].strip()
             g.add_edge(n1, n2, float(ed[2].strip()))
-    print('calculating...')
+    print('calculating properties for graph {}'.format(label))
     g.calc_dists()
+    g.calc_coreness()
     g.calc_cluster_coefficient()
-    pickle.dump(g, open("backend/model/kingdom.pkl", "wb"))
+    print('calculation properties for graph {} done'.format(label))
+    if not os.path.exists("backend/model/cache/"):
+        os.makedirs("backend/model/cache/")
+    pickle.dump(g, open("backend/model/cache/{}.pkl".format(label), "wb"))
     return g
+
+
+class RedGraph(Graph):
+    def get_node_class(self, node):
+        return node.label[0]
+
+
+class KingdomGraph(Graph):
+    def __init__(self):
+        super().__init__()
+        self.country_map = {}
+        with open('backend/data/parsed/kingdom/countries/qun.txt', 'r') as f:
+            for name in f.readlines():
+                self.country_map[name.strip()] = 'qun'
+        with open('backend/data/parsed/kingdom/countries/wei.txt', 'r') as f:
+            for name in f.readlines():
+                self.country_map[name.strip()] = 'wei'
+        with open('backend/data/parsed/kingdom/countries/shu.txt', 'r') as f:
+            for name in f.readlines():
+                self.country_map[name.strip()] = 'shu'
+        with open('backend/data/parsed/kingdom/countries/wu.txt', 'r') as f:
+            for name in f.readlines():
+                self.country_map[name.strip()] = 'wu'
+
+    def get_node_color_map(self):
+        return {
+            'wei': "#097AFF",
+            "shu": "#FD9A28",
+            "wu": "#3abc98",
+            "qun": "#C1CBCA"
+        }
+
+    def get_node_class(self, node):
+        if node.label in self.country_map.keys():
+            return self.country_map[node.label]
+        else:
+            return 'qun'
+
+
+class WestGraph(Graph):
+    def get_node_class(self, node):
+        return node.label[0]
+
+
+class WhoGraph(Graph):
+    def get_node_class(self, node):
+        return node.label[0]
+
+
+def load_kingdom_graph():
+    return load_graph(KingdomGraph, "kingdom")
+
+
+def load_red_graph():
+    return load_graph(RedGraph, "red")
+
+
+def load_west_graph():
+    return load_graph(RedGraph, "west")
+
+
+def load_who_graph() -> object:
+    return load_graph(WhoGraph, "who")

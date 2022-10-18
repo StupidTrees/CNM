@@ -41,6 +41,14 @@ cards = [dbc.Card(
     body=True,
     color="dark",
     inverse=True,
+), dbc.Card(
+    [
+        html.H2(f"{0:.2f}", className="card-title", id="coreness"),
+        html.P("Coreness", className="card-text"),
+    ],
+    body=True,
+    color="dark",
+    inverse=True,
 )
 ]
 panel = html.Div(
@@ -104,8 +112,11 @@ charts = html.Div(
             stylesheet=[],
             responsive=True
         )
+
         , dcc.Graph(id='popular_nodes')
+        , dcc.Graph(id='coreness_nodes')
         , dcc.Graph(id='cluster_nodes')
+        ,dcc.Markdown(id='cytoscape-selectedNodeData-markdown')
     ]
 )
 app.layout = html.Div(
@@ -149,7 +160,9 @@ def update_label(degree_range):
     Output("avg_degree", "children"),
     Output("avg_path_len", "children"),
     Output("cluster_co", "children"),
+    Output("coreness", "children"),
     Output("popular_nodes", "figure"),
+    Output("coreness_nodes", "figure"),
     Output("cluster_nodes", "figure"),
     Input("window-dropdown", "value"),
     Input("degree-slider", "value")
@@ -175,8 +188,15 @@ def update_figure(book, degree_range):
         data=[go.Bar(x=[n.id for n, _ in pn], y=[degree for _, degree in pn])],
         layout_title_text="人物度数"
     )
+
+    con = graph.get_high_coreness_nodes()
+    coreness = go.Figure(
+        data=[go.Bar(x=[n.id for n, _ in con], y=[degree for _, degree in con])],
+        layout_title_text="人物Coreness"
+    )
     return e, "{:.2f}".format(graph.get_average_degree()), "{:.2f}".format(
-        graph.get_average_path_length()), "{:.2f}".format(graph.get_cluster_coefficient()), popular, cluster
+        graph.get_average_path_length()), "{:.2f}".format(
+        graph.get_cluster_coefficient()), "{:.2f}".format(graph.get_coreness()), popular, coreness, cluster
 
 
 @app.callback(
@@ -184,7 +204,7 @@ def update_figure(book, degree_range):
     Input("window-dropdown", "value"),
     Input("degree-slider", "value")
 )
-def update_figure(book, degree_range):
+def update_style(book, degree_range):
     global ss
     if book == 'red':
         ss, e = graph_to_view(red_graph, degree_range)
@@ -201,16 +221,16 @@ def update_figure(book, degree_range):
     Output("cytoscape", "layout"),
     Input("layout-radio", "value")
 )
-def update_figure(type):
+def update_layout(type):
     layout = {}
-    if type== 'cose':
+    if type == 'cose':
         layout = {
             'idealEdgeLength': 200,
             'refresh': 20,
             'fit': True,
             'padding': 30,
             'randomize': False,
-            'animate':False,
+            'animate': False,
             'componentSpacing': 200,
             'nodeRepulsion': 20000000,
             'nodeOverlap': 500,
@@ -224,3 +244,13 @@ def update_figure(type):
         }
     layout["name"] = type
     return layout
+
+
+@app.callback(Output('cytoscape-selectedNodeData-markdown', 'children'),
+              Input('cytoscape', 'selectedNodeData'))
+def display_selection(data_list):
+    if data_list is None:
+        return "nothing"
+
+    cities_list = [data['label'] for data in data_list]
+    return "You selected the following cities: " + "\n* ".join(cities_list)

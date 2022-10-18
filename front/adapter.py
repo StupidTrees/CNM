@@ -5,11 +5,8 @@ def graph_to_view(graph, degree_range=None):
     if degree_range is None:
         degree_range = [0, 1000]
     elements = []
-    class_color_map = {}
     for node in graph.nodes:
-        node_class = graph.get_node_class(node)
         if degree_range[1] >= node.get_degree() >= degree_range[0]:
-            class_color_map[node_class] = random_color(len(class_color_map))
             elements.append(
                 {"data": {"id": str(node.id), "label": node.label, 'class_name': graph.get_node_class(node)}, })
     for fe, tes in graph.edges.items():
@@ -33,7 +30,7 @@ def graph_to_view(graph, degree_range=None):
              'width': "2px",
              'line-opacity': "50%"
          }}]
-    for fn, cl in class_color_map.items():
+    for fn, cl in graph.get_node_color_map().items():
         ss.append(
             {'selector': '[class_name *= "{}"]'.format(fn),
              'style': {

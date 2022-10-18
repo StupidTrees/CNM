@@ -3,6 +3,7 @@ import math
 import numpy as np
 
 from backend.model.node import Node
+from utils.color import random_color
 
 
 class Graph:
@@ -16,6 +17,7 @@ class Graph:
         self.nodes_id_ptr = 0
         self.dists = {}
         self.cluster_coefficient = {}
+        self.coreness = {}
 
     # 构建图
     def add_node(self, label="", id=None):
@@ -44,6 +46,9 @@ class Graph:
         return res / len(self.nodes)
 
     def calc_dists(self):
+        """
+        计算任意两个节点之间的距离
+        """
         dists = {}
         for n in self.nodes:
             u = []
@@ -62,6 +67,9 @@ class Graph:
         self.dists = dists
 
     def calc_cluster_coefficient(self):
+        """
+        计算每个节点的聚类系数
+        """
         for node in self.nodes:
             e = len(node.neighbours) + len(node.prevs)
             if e == 1 or e == 0:
@@ -77,6 +85,29 @@ class Graph:
                                 visit.append((nb, nbn))
                                 r += 1
                 self.cluster_coefficient[node] = r / (e * (e - 1) / 2)
+
+    def calc_coreness(self):
+        """
+        计算coreness
+        """
+        degrees = {}
+        for node in self.nodes:
+            degrees[node] = node.get_degree()
+        k = 1
+        coreness = {}
+        while len(degrees) > 0:
+            for node in list(degrees.keys()):
+                if node in degrees.keys() and degrees[node] <= k - 1:
+                    coreness[node] = k - 1  # 删去时，记录coreness
+                    del degrees[node]
+                    for nb, _ in node.neighbours + node.prevs:
+                        if nb in degrees.keys():
+                            degrees[nb] = degrees[nb] - 1
+                            if degrees[nb] <= k - 1:
+                                del degrees[nb]
+                                coreness[nb] = k - 1
+            k += 1
+        self.coreness = coreness
 
     def get_dist(self, x, y):
         if len(self.dists) == 0:
@@ -103,7 +134,10 @@ class Graph:
             self.calc_cluster_coefficient()
         return np.average([x for x in self.cluster_coefficient.values()])
 
-    # 其他功能
+    def get_coreness(self):
+        return max(self.coreness.values())
+
+
 
     def get_node_class(self, node):
         """
@@ -113,6 +147,13 @@ class Graph:
         """
         pass
 
+    def get_node_color_map(self):
+        class_color_map = {}
+        for node in self.nodes:
+            node_class = self.get_node_class(node)
+            class_color_map[node_class] = random_color(len(class_color_map))
+        return class_color_map
+
     def get_popular_nodes(self, n=None):
         nodes = [(n, n.get_degree()) for n in self.nodes]
         nodes = sorted(nodes, key=lambda x: x[1], reverse=True)
@@ -121,8 +162,15 @@ class Graph:
         return nodes[:n]
 
     def get_low_cluster_nodes(self, n=None):
-        nodes = [(n, v) for n,v in self.cluster_coefficient.items()]
+        nodes = [(n, v) for n, v in self.cluster_coefficient.items()]
         nodes = sorted(nodes, key=lambda x: x[1], reverse=False)
+        if n is None:
+            n = len(nodes)
+        return nodes[:n]
+
+    def get_high_coreness_nodes(self, n=None):
+        nodes = [(n, cn) for n, cn in self.coreness.items()]
+        nodes = sorted(nodes, key=lambda x: x[1], reverse=True)
         if n is None:
             n = len(nodes)
         return nodes[:n]
