@@ -13,7 +13,7 @@ class ViewModel:
         self.keys = []
         self.names = []
         for file_name in os.listdir(raw_path):
-            if not os.path.isdir(raw_path+file_name):
+            if not os.path.isdir(raw_path + file_name):
                 continue
             self.keys.append(file_name.strip())
             if file_name in name_map.keys():
@@ -42,8 +42,19 @@ class ViewModel:
 
         self.is_ia = False
         self.ia_selected = []
+        self.ready_upload = False
+        self.upload_key = None
+        self.upload_content = None
+
+    def add_graph(self, key):
+        self.keys.append(key)
+        self.names.append(key)
+        self.graphs[key] = load_any_graph(key)
+        self.graph_raw[key] = load_any_graph(key)
 
     def get_graph(self, key, reset=False):
+        if key not in self.graphs.keys():
+            self.add_graph(key)
         if reset:
             if key == 'red':
                 self.graphs[key] = load_red_graph()

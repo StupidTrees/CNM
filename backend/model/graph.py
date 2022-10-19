@@ -181,6 +181,13 @@ class Graph:
     def get_coreness(self):
         return max(self.coreness.values())
 
+    def get_degree_distribution(self):
+        dis = {}
+        for node in self.nodes:
+            dis.setdefault(node.get_degree(), 0)
+            dis[node.get_degree()] += 1
+        return dis
+
     def get_node_class(self, node):
         """
         获得结点类别，例如红楼梦的家族，三国的势力

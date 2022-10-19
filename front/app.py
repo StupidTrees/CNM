@@ -1,3 +1,6 @@
+import base64
+import io
+import os
 import random
 
 import dash_bootstrap_components as dbc
@@ -8,7 +11,10 @@ from dash import html
 from dash import Dash
 from dash.dependencies import Output, Input, State
 import plotly.graph_objects as go
+from dash.long_callback import DiskcacheManager
 
+import utils.config
+from backend.process import generate_novel_graph
 from front.adapter import graph_to_view
 from front.view_model import ViewModel
 
@@ -16,6 +22,11 @@ external_stylesheets = [
     "https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css",
     "https://codepen.io/chriddyp/pen/bWLwgP.css",
 ]
+
+import diskcache
+
+cache = diskcache.Cache("./cache")
+background_callback_manager = DiskcacheManager(cache)
 
 app = Dash(__name__, external_stylesheets=external_stylesheets)
 viewModel = ViewModel()
@@ -79,6 +90,29 @@ panel = dbc.Card(
             style={"padding": "20 20 20 20"}
         ),
         html.Br(),
+        dcc.Upload([
+            '拖拽或',
+            html.A('选择小说txt文件')
+        ], style={
+            'width': '100%',
+            'height': '60px',
+            'lineHeight': '60px',
+            'borderWidth': '1px',
+            'borderStyle': 'dashed',
+            'borderRadius': '5px',
+            'textAlign': 'center'
+        }, id='upload', multiple=False),
+        html.Div(id="upload-result"),
+        dbc.Spinner(html.Div(id="loading-output"), color="primary"),
+        dbc.Collapse(
+            dbc.Row(
+                [dbc.Col(dbc.Button('进行分析', id='add_graph', color='primary'), width=3),
+                 dbc.Col(dbc.Button('取消', id='upload_cancel', color='light'), width=3),
+                 ]
+            ), id="upload-buttons", is_open=False
+        ),
+        dbc.Label('', id='upload-label')
+        ,
 
     ], body=True
 )
@@ -193,7 +227,7 @@ app.layout = dbc.Container(
             dbc.Row([dbc.Col(dcc.Graph(id='popular_nodes'))
                         , dbc.Col(dcc.Graph(id='coreness_nodes'))
                      ]),
-            dbc.Row([dbc.Col(dcc.Graph(id='cluster_nodes'))]),
+            dbc.Row([dbc.Col(dcc.Graph(id='degree_distribution')),dbc.Col(dcc.Graph(id='cluster_nodes'))]),
         ]),
         dbc.Toast(
             id="popover",
@@ -281,6 +315,7 @@ def intentional_attack(x, a, b, d):
     Output("nodes_category", "children"),
     Output("popular_nodes", "figure"),
     Output("coreness_nodes", "figure"),
+    Output("degree_distribution", "figure"),
     Output("cluster_nodes", "figure"),
     Output('ia-label', 'children'),
     Input("window-dropdown", "value"),
@@ -311,6 +346,11 @@ def update_figure(book, degree_range, random_attack_click, reset_click, ia_label
         data=[go.Bar(x=[n.id for n, _ in cn], y=[ce for _, ce in cn])],
         layout_title_text="人物聚类系数"
     )
+    dd = graph.get_degree_distribution()
+    degree_dis = go.Figure(
+        data=[go.Bar(x=list(dd.keys()), y=list(dd.values()))],
+        layout_title_text="度数分布"
+    )
     pn = graph.get_popular_nodes()
     popular = go.Figure(
         data=[go.Bar(x=[n.id for n, _ in pn], y=[degree for _, degree in pn])],
@@ -332,7 +372,7 @@ def update_figure(book, degree_range, random_attack_click, reset_click, ia_label
         graph.get_average_degree()), "{:.2f}".format(
         graph.get_average_path_length()), "{:.2f}".format(
         graph.get_cluster_coefficient()), "{:.2f}".format(graph.get_coreness()), \
-           nodes_cate, popular, coreness, cluster, ""
+           nodes_cate, popular, coreness, degree_dis,cluster, ""
 
 
 @app.callback(
@@ -409,3 +449,74 @@ def display_hover_node(data):
             content.append(dbc.ListGroupItem("Coreness：{}".format(graph.coreness[node])))
         return True, content
     return False, []
+
+
+@app.callback(
+    Output("upload-label", "children"),
+    Output("window-dropdown", "options"),
+    Output("window-dropdown", "value"),
+    Input('add_graph', 'n_clicks'),
+    background =True,
+    prevent_initial_call=True,
+    running=[
+        (Output("add_graph", "disabled"), True, False),
+        (Output("loading-output", "children"), "导入并建模中...需要点时间", "导入完成"),
+    ], manager=background_callback_manager)
+def add_graph(a):
+    key = viewModel.upload_key
+    dir = utils.config.raw_path + viewModel.upload_key + "/"
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+    with open(utils.config.raw_path + "{}/{}.txt".format(viewModel.upload_key, viewModel.upload_key), "w+") as f:
+        f.write(viewModel.upload_content)
+    if os.path.exists('backend/model/cache/{}.pkl'.format(key)):
+        os.remove('backend/model/cache/{}.pkl'.format(key))
+    generate_novel_graph(key)
+    viewModel.add_graph(key)
+    viewModel.upload_content = None
+    viewModel.upload_key = None
+    viewModel.ready_upload = False
+    return "", [{"label": name, "value": value} for name, value in zip(viewModel.names, viewModel.keys)], key
+
+
+@app.callback(
+    Output('upload-buttons', 'is_open'),
+    Output('upload-result', 'children'),
+    Input('upload', 'contents'),
+    Input('upload_cancel', 'n_clicks'),
+    Input('upload-label', 'children'),
+    State('upload', 'filename'))
+def update_output(list_of_contents, upload_cancel, upload_label, list_of_names):
+    trigger_id = ctx.triggered_id
+    if trigger_id == 'upload_cancel' or trigger_id == 'upload-label':
+        viewModel.upload_content = None
+        viewModel.ready_upload = False
+        return False, ""
+    elif trigger_id == "upload" and list_of_contents is not None:
+        return parse_contents(list_of_contents, list_of_names)
+    return viewModel.ready_upload, ""
+
+
+def parse_contents(contents, filename):
+    content_type, content_string = contents.split(',')
+    decoded = base64.b64decode(content_string)
+    contents = ""
+    key = filename.split(".")[0]
+    try:
+        for line in io.StringIO(decoded.decode('utf-8')).readlines():
+            contents += line
+        viewModel.upload_content = contents
+        viewModel.ready_upload = True
+        viewModel.upload_key = key
+    except Exception:
+        viewModel.ready_upload = False
+        return False, html.Div([
+            'There was an error processing this file.'
+        ])
+    return True, html.Div([
+        html.H5(key),
+        html.Pre(contents[0:100] + '...', style={
+            'whiteSpace': 'pre-wrap',
+            'wordBreak': 'break-all'
+        })
+    ])
