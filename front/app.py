@@ -68,10 +68,11 @@ panel = dbc.Card(
         dcc.Dropdown(
             id="window-dropdown",
             options=[
-                {"label": "红楼梦", "value": "red"},
-                {"label": "三国演义", "value": "kingdom"},
-                {"label": "西游记", "value": "west"},
-                {"label": "水浒传", "value": "who"},
+                {"label": name, "value": value} for name, value in zip(viewModel.names, viewModel.keys)
+                # {"label": "红楼梦", "value": "red"},
+                # {"label": "三国演义", "value": "kingdom"},
+                # {"label": "西游记", "value": "west"},
+                # {"label": "水浒传", "value": "who"},
             ],
             value="red",
             clearable=False,
@@ -197,7 +198,7 @@ app.layout = dbc.Container(
         dbc.Toast(
             id="popover",
             is_open=False,
-            #dismissable=True,
+            # dismissable=True,
             # duration=500,
             # icon="primary",
             # top: 66 positions the toast below the navbar

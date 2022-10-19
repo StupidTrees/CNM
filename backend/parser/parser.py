@@ -1,7 +1,10 @@
 import os
 import sys
 import codecs
+
+from utils.config import raw_path
 from .LineParser import parse_line
+from .extracter import extract_names
 
 
 class RelationAdjacentMatrix:
@@ -39,7 +42,7 @@ class NovelCharacterRelationParser:
         nameList: list[str] = []
         with codecs.open(nameFilename, 'r', 'utf8') as f:
             for line in f.readlines():
-                nameList.append(line.split('\r')[0])
+                nameList.append(line.split('\r')[0].strip())
         return nameList
 
     @staticmethod
@@ -62,9 +65,11 @@ class NovelCharacterRelationParser:
 
 
 def parse_novel_text(label):
-    parser = NovelCharacterRelationParser('backend/data/raw/{}/{}.txt'.format(label, label),
-                                          'backend/data/raw/{}/charac_name.txt'.format(label),
-                                          'backend/data/raw/{}/charac_alias.txt'.format(label))
+    if not os.path.exists(raw_path+'{}/charac_name.txt'.format(label, label)):
+        extract_names(raw_path+'{}/{}.txt'.format(label, label), label)
+    parser = NovelCharacterRelationParser(raw_path+'{}/{}.txt'.format(label, label),
+                                          raw_path+'{}/charac_name.txt'.format(label),
+                                          raw_path+'{}/charac_alias.txt'.format(label))
     if not os.path.exists('backend/data/parsed/{}/'.format(label)):
         os.makedirs('backend/data/parsed/{}/'.format(label))
     with codecs.open('backend/data/parsed/{}/{}.csv'.format(label, label), 'w+', 'utf8') as f:

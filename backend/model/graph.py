@@ -187,7 +187,7 @@ class Graph:
         :param node:
         :return: string，class
         """
-        pass
+        return node.label[0]
 
     def get_node_color_map(self):
         class_color_map = {}

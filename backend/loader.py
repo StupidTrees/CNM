@@ -5,6 +5,7 @@ import sys
 from os import path
 
 from backend.model.graph import Graph
+from backend.process import generate_novel_graph
 
 
 def generate_random_graph(size):
@@ -29,6 +30,8 @@ def load_graph(clz, label):
     if path.exists("backend/model/cache/{}.pkl".format(label)):
         print('load graph {} from disk...'.format(label))
         return pickle.load(open("backend/model/cache/{}.pkl".format(label), 'rb'))
+    if not path.exists('backend/data/parsed/{}/names.txt'.format(label)):
+        generate_novel_graph(label)
     with open('backend/data/parsed/{}/names.txt'.format(label), 'r') as f:
         for x in f.readlines():
             g.add_node(x.strip(), x.strip())
@@ -58,6 +61,7 @@ class RedGraph(Graph):
         map['王'] = "#ECAD00"
         map['靴'] = "#F0AA34"
         return map
+
     def get_node_class(self, node):
         return node.label[0]
 
@@ -118,3 +122,7 @@ def load_west_graph():
 
 def load_who_graph() -> object:
     return load_graph(WhoGraph, "who")
+
+
+def load_any_graph(key) -> object:
+    return load_graph(Graph, key)
