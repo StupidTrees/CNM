@@ -10,7 +10,7 @@ def graph_to_view(graph, degree_range=None):
             elements.append(
                 {"data": {"id": str(node.id), "label": node.label, 'class_name': graph.get_node_class(node)}, })
     for fe, tes in graph.edges.items():
-        for te, weight in tes:
+        for te, weight in tes.items():
             fen = graph.id2nodes[fe]
             ten = graph.id2nodes[te]
             if degree_range[1] < fen.get_degree() or fen.get_degree() < degree_range[0] or degree_range[

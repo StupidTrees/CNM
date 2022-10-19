@@ -18,6 +18,7 @@ class Graph:
         self.dists = {}
         self.cluster_coefficient = {}
         self.coreness = {}
+        self.connected_components_num = None
 
     # 构建图
     def add_node(self, label="", id=None):
@@ -28,15 +29,32 @@ class Graph:
         self.nodes.add(n)
         self.size += 1
 
+    def remove_nodes(self, node_ids):
+        for id in node_ids:
+            nn = self.id2nodes[id]
+            for nb_id in nn.get_all_neighbour_id():
+                nb = self.id2nodes[nb_id]
+                nb.remove_neighbour(id)
+            if id in self.edges.keys():
+                del self.edges[id]
+            for fe, tes in self.edges.items():
+                if id in tes.keys():
+                    del tes[id]
+            if nn in self.coreness.keys():
+                del self.coreness[nn]
+            if nn in self.cluster_coefficient.keys():
+                del self.cluster_coefficient[nn]
+            self.nodes.remove(nn)
+
     def add_edge(self, from_id, to_id, weight=0.0):
         if from_id == to_id:
             return
         if from_id in self.nodes2id.values() and to_id in self.nodes2id.values():
             if from_id not in self.edges.keys():
-                self.edges[from_id] = []
-            self.edges[from_id].append((to_id, weight))
-            self.id2nodes[from_id].neighbours.append((self.id2nodes[to_id], weight))
-            self.id2nodes[to_id].prevs.append((self.id2nodes[from_id], weight))
+                self.edges[from_id] = {}
+            self.edges[from_id][to_id] = weight
+            self.id2nodes[from_id].neighbours[to_id] = weight
+            self.id2nodes[to_id].prevs[from_id] = weight
 
     # 基本参数的计算
     def get_average_degree(self):
@@ -45,6 +63,14 @@ class Graph:
             res += n.get_degree()
         return res / len(self.nodes)
 
+    def get_connected_component_num(self):
+        """
+        获得连通分量数
+        """
+        if self.connected_components_num is None:
+            self.calc_connected_components_num()
+        return self.connected_components_num
+
     def calc_dists(self):
         """
         计算任意两个节点之间的距离
@@ -52,37 +78,55 @@ class Graph:
         dists = {}
         for n in self.nodes:
             u = []
-            v = [x for x in self.nodes]
-            dis = {x: math.inf for x in v}
-            dis[n] = 0
+            v = [x.id for x in self.nodes]
+            dis = {id: math.inf for id in v}
+            dis[n.id] = 0
             while len(v) > 0:
                 v = sorted(v, key=lambda x: dis[x])
-                fir = v.pop(0)
-                u.append(fir)
-                for nxt, _ in fir.neighbours + fir.prevs:
-                    if nxt not in u:
-                        dis[nxt] = min(dis[nxt], dis[fir] + 1)
+                fir = self.id2nodes[v.pop(0)]
+                u.append(fir.id)
+                for nxt_id in fir.get_all_neighbour_id():
+                    if nxt_id not in u:
+                        dis[nxt_id] = min(dis[nxt_id], dis[fir.id] + 1)
+                        u.append(nxt_id)
                     if (fir, n) not in dists.keys():
-                        dists[(n, fir)] = dis[fir]
+                        dists[(n, fir)] = dis[fir.id]
         self.dists = dists
+
+    def calc_connected_components_num(self):
+        visit = []
+        num = 0
+        for node in self.nodes:
+            if node.id in visit:
+                continue
+            num += 1
+            queue = [node.id]
+            while len(queue) > 0:
+                x = queue.pop(0)
+                for nb_id in self.id2nodes[x].get_all_neighbour_id():
+                    if nb_id not in visit:
+                        visit.append(nb_id)
+                        queue.append(nb_id)
+        self.connected_components_num = num
 
     def calc_cluster_coefficient(self):
         """
         计算每个节点的聚类系数
         """
         for node in self.nodes:
-            e = len(node.neighbours) + len(node.prevs)
+            e = node.get_degree()
             if e == 1 or e == 0:
                 self.cluster_coefficient[node] = e
             else:
                 r = 0
                 visit = []
-                neighbours = [n for n, _ in node.neighbours + node.prevs]
-                for nb in neighbours:
-                    for nbn, _ in nb.neighbours + nb.prevs:
-                        if nbn in neighbours:
-                            if (nb, nbn) not in visit and (nbn, nb) not in visit:
-                                visit.append((nb, nbn))
+                neighbours = [n_id for n_id in node.get_all_neighbour_id()]
+                for nb_id in neighbours:
+                    nb = self.id2nodes[nb_id]
+                    for nb_nb_id in nb.get_all_neighbour_id():
+                        if nb_nb_id in neighbours:
+                            if (nb_id, nb_nb_id) not in visit and (nb_nb_id, nb_id) not in visit:
+                                visit.append((nb_id, nb_nb_id))
                                 r += 1
                 self.cluster_coefficient[node] = r / (e * (e - 1) / 2)
 
@@ -100,7 +144,7 @@ class Graph:
                 if node in degrees.keys() and degrees[node] <= k - 1:
                     coreness[node] = k - 1  # 删去时，记录coreness
                     del degrees[node]
-                    for nb, _ in node.neighbours + node.prevs:
+                    for nb in node.get_all_neighbour_id():
                         if nb in degrees.keys():
                             degrees[nb] = degrees[nb] - 1
                             if degrees[nb] <= k - 1:
@@ -136,8 +180,6 @@ class Graph:
 
     def get_coreness(self):
         return max(self.coreness.values())
-
-
 
     def get_node_class(self, node):
         """

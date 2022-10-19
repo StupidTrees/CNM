@@ -50,6 +50,14 @@ def load_graph(clz, label):
 
 
 class RedGraph(Graph):
+    def get_node_color_map(self):
+        map = super().get_node_color_map()
+        map['贾'] = "#26A7FF"
+        map['史'] = "#3abc98"
+        map['林'] = "#EC4A94"
+        map['王'] = "#ECAD00"
+        map['靴'] = "#F0AA34"
+        return map
     def get_node_class(self, node):
         return node.label[0]
 
